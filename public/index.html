@@ -1,0 +1,35 @@
+<!doctype html>
+<html lang="es">
+<head>
+  <meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Tareas DevOps — ITLA</title>
+  <style>
+    :root{font-family:system-ui,sans-serif;color:#172033;background:#f4f7fb}*{box-sizing:border-box}
+    body{max-width:760px;margin:48px auto;padding:0 18px}.panel{background:#fff;padding:28px;border-radius:16px;box-shadow:0 8px 30px #17203312}
+    h1{margin-top:0;color:#1f3b63}.muted{color:#64748b;font-size:.92rem}form{display:flex;gap:10px;margin:22px 0}
+    input{flex:1;min-width:0;padding:12px;border:1px solid #cbd5e1;border-radius:8px;font:inherit}button{border:0;border-radius:8px;padding:11px 15px;background:#2457a6;color:white;font:inherit;cursor:pointer}
+    button.delete{background:#b42318;padding:6px 10px}li{display:flex;align-items:center;gap:10px;padding:12px 0;border-bottom:1px solid #e5eaf1}
+    li span{flex:1;cursor:pointer}li.hecha span{text-decoration:line-through;color:#788397}#estado{font-size:.85rem}
+  </style>
+</head>
+<body><main class="panel"><h1>Lista de tareas</h1>
+  <p class="muted">Aplicación demostrativa para la práctica de CI/CD del ITLA.</p>
+  <p id="estado" class="muted">Conectando...</p>
+  <form id="form"><input id="titulo" maxlength="100" placeholder="Escribe una tarea (máx. 100 caracteres)" required><button>Agregar</button></form>
+  <ul id="lista"></ul>
+</main>
+<script>
+  const lista=document.querySelector('#lista'), formulario=document.querySelector('#form'), campo=document.querySelector('#titulo'), estado=document.querySelector('#estado');
+  let modoApi=false, tareasLocal=JSON.parse(localStorage.getItem('tareas-devops-itla')||'[]');
+  async function iniciar(){try{const r=await fetch('/health');modoApi=r.ok;}catch{modoApi=false;}
+    estado.textContent=modoApi?'Modo API: datos en memoria del servidor.':'Modo GitHub Pages: datos guardados en este navegador.';cargar();}
+  async function cargar(){let tareas=tareasLocal;if(modoApi){try{const r=await fetch('/api/tareas');if(!r.ok)throw Error();tareas=await r.json();}catch{estado.textContent='API no disponible; usando almacenamiento local.';modoApi=false;}}
+    lista.replaceChildren();tareas.forEach(t=>{const li=document.createElement('li'),texto=document.createElement('span'),b=document.createElement('button');texto.textContent=t.titulo;li.className=t.completada?'hecha':'';texto.title='Clic para cambiar el estado';texto.onclick=()=>alternar(t.id);b.textContent='Eliminar';b.className='delete';b.onclick=()=>eliminar(t.id);li.append(texto,b);lista.append(li);});}
+  async function guardarLocal(){localStorage.setItem('tareas-devops-itla',JSON.stringify(tareasLocal));}
+  formulario.onsubmit=async e=>{e.preventDefault();const titulo=campo.value.trim();if(!titulo||titulo.length>100)return;
+    if(modoApi)await fetch('/api/tareas',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({titulo})});
+    else{tareasLocal.push({id:Date.now(),titulo,completada:false});await guardarLocal();}campo.value='';cargar();};
+  async function alternar(id){if(modoApi)await fetch('/api/tareas/'+id,{method:'PATCH'});else{tareasLocal=tareasLocal.map(t=>t.id===id?{...t,completada:!t.completada}:t);await guardarLocal();}cargar();}
+  async function eliminar(id){if(modoApi)await fetch('/api/tareas/'+id,{method:'DELETE'});else{tareasLocal=tareasLocal.filter(t=>t.id!==id);await guardarLocal();}cargar();}
+  iniciar();
+</script></body></html>
